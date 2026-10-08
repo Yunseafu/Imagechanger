@@ -45,10 +45,10 @@ a{color:var(--acc)}
 
 <div id="drop">
   <strong>选择或拖入 HEIC 原图</strong>
-  <span>可多选 · Live Photo 请把同名的 HEIC 和 MOV 一起选 · 已带风格数据的照片会跳过</span>
+  <span>可多选 · Live Photo 请用「从文件选择」把同名的 HEIC 和 MOV 一起选 · 已带风格数据的照片会跳过</span>
   <div class="btns">
     <label class="pick primary"><input id="file" type="file" multiple>从「文件」选择(推荐,保留原图)</label>
-    <label class="pick"><input id="photos" type="file" accept="image/heic,image/heif,video/quicktime,.heic,.heif,.mov" multiple>从相册选择</label>
+    <label class="pick"><input id="photos" type="file" accept="image/heic,image/heif" multiple>从相册选择</label>
   </div>
 </div>
 <ul id="out" aria-live="polite"></ul>
@@ -66,9 +66,12 @@ a{color:var(--acc)}
   <li class="step">iPhone 设置 → 相机 → 格式 选「高效」,否则拍出来是 JPEG,无法处理。</li>
 </ol>
 
+<h2>想直接从「照片」处理?</h2>
+<p class="notes">网页拿不到相册原图,请用「分享 → 快捷指令」:<a href="https://github.com/yunseafu/imagechanger/blob/main/docs/PHOTOS.md">从照片直接处理</a>。</p>
+
 <h2>想用 Siri 自动处理?</h2>
 <p class="notes">在家里电脑/NAS 上运行本地服务,再建一个快捷指令即可,见
-<a href="https://github.com/yunseafu/imagechanger/blob/claude/zealous-edison-u48pio/docs/SIRI.md">Siri 指南</a>。</p>
+<a href="https://github.com/yunseafu/imagechanger/blob/main/docs/SIRI.md">Siri 指南</a>。</p>
 
 <footer>代码开源(MIT):<a href="https://github.com/yunseafu/imagechanger">github.com/yunseafu/imagechanger</a> · 非 Apple 官方项目</footer>
 </main>

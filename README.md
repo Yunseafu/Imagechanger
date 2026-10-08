@@ -41,7 +41,7 @@ python -m unittest discover -s tests -t .             # 测试(需 pip install p
 
 - 直接运行:`pip install .` 后执行 `imagechanger serve`(仅标准库,无其他依赖)。
 - Docker:`docker compose up -d --build`,快捷指令里填 `http://<服务器局域网IP>:8765/patch`。
-- Siri / 自动化:见 [docs/SIRI.md](docs/SIRI.md)。
+- Siri / 自动化:见 [docs/SIRI.md](docs/SIRI.md);从「照片」分享菜单直接处理:见 [docs/PHOTOS.md](docs/PHOTOS.md)。
 
 服务器**没有登录**,只会响应私有网络地址的客户端;请勿暴露到公网,也不要使用别人搭的服务器(会收到你的原图和 GPS)。
 
