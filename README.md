@@ -20,7 +20,7 @@
 
 `imagechanger/` 各模块:`bmff.py`(HEIF 容器读写)、`exif.py`(MakerNote 标签插入)、`styles.py`(plist 构造)、`icc.py`(生成 Display P3 Linear 色彩描述)、`neutral_tile.py`(由 `tools/gen_neutral_tile.py` 用 ffmpeg 生成的中性 HEVC 瓦片)、`patch.py`(编排)、`server.py`(局域网服务)。
 
-**范围**:只做调色板(Style)。未实现 iOS 27 质感/颗粒、柔肤、人像图层;同样不会依据画面计算光照图(使用中性默认值)。已知尺寸表仅含 12MP(4032×3024)、24MP(5712×4284)、前置(3088×2316)及其竖向存储;其他尺寸用 `--delta-size WxH` 手动指定。
+**范围**:调色板(Style)和 iOS 27 颗粒(Texture/Grain:`texture_styles` 条目 + 12 个空的 2026 版遮罩及 XMP,二者必须成套)。已处理过只有调色盘的照片,再处理一次会只补颗粒。未实现柔肤、人像图层;同样不会依据画面计算光照图(使用中性默认值)。已知尺寸表仅含 12MP(4032×3024)、24MP(5712×4284)、前置(3088×2316)及其竖向存储;其他尺寸用 `--delta-size WxH` 手动指定。
 
 ## 使用
 

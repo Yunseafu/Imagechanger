@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from imagechanger import icc, neutral_tile, styles  # noqa: E402
+from imagechanger import icc, matte_tile, neutral_tile, styles, texture  # noqa: E402
 
 
 def b64(b):
@@ -20,5 +20,8 @@ half = lambda v: struct.unpack("<H", struct.pack("<e", v))[0]
     f'export const COLR_BOX = "{b64(icc.colr_box())}";\n'
     f'export const TILE_HVCC = "{b64(neutral_tile.HVCC)}";\n'
     f'export const TILE_SAMPLE = "{b64(neutral_tile.SAMPLE)}";\n'
+    f'export const MATTE_HVCC = "{b64(matte_tile.HVCC)}";\n'
+    f'export const MATTE_SAMPLE = "{b64(matte_tile.SAMPLE)}";\n'
+    f'export const XMP = "{b64(texture.XMP)}";\n'
     f"export const HALF_C = {half(styles.FLAT_TONE_MAPPED)};\n"
     f"export const HALF_D = {half(styles.FLAT_LINEAR)};\n")

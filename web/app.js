@@ -39,7 +39,9 @@ async function run(files) {
       if (looksLikeHeic(data)) {
         const { data: out, report } = patch(data);
         const hasVideo = items.some((y) => isMov(y.data) && baseName(y.f.name).toLowerCase() === baseName(f.name).toLowerCase());
-        m.textContent = `完成 · ${report.primary.join("×")} · ${(out.length / 1048576).toFixed(1)} MB` + (hasVideo ? " · Live Photo 的静态图" : "");
+        m.textContent = report.textureOnly
+          ? "已有调色盘,已补上颗粒(iOS 27)"
+          : `完成(调色盘 + 颗粒) · ${report.primary.join("×")} · ${(out.length / 1048576).toFixed(1)} MB` + (hasVideo ? " · Live Photo 的静态图" : "");
         download(li, out, "image/heic", baseName(f.name) + "_styled.heic");
       } else if (isMov(data)) {
         if (!stems.has(baseName(f.name).toLowerCase())) { bad(m, "这是 Live Photo 的视频,但没选到同名的 HEIC。请连同 HEIC 一起选。"); continue; }
@@ -55,7 +57,7 @@ async function run(files) {
         bad(m, "无法识别的文件类型");
       }
     } catch (e) {
-      if (e instanceof AlreadyStyled) m.textContent = "已带风格数据,无需处理";
+      if (e instanceof AlreadyStyled) m.textContent = "已带调色盘和颗粒数据,无需处理";
       else bad(m, "无法处理:" + e.message);
     }
   }

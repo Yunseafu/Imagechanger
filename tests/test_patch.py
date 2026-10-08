@@ -78,6 +78,31 @@ class PatchTest(unittest.TestCase):
         o54 = tags[0x54][2]
         self.assertEqual(mn[o54:o54 + tags[0x54][1]], exif.style_record())
 
+    def test_grain_items(self):
+        from imagechanger import texture
+        m, _ = parse_meta(self.out)
+        uris = [m.aux_uri(i) for i in m.items.values()]
+        for u in texture.MATTE_URIS:
+            self.assertIn(u, uris)
+        tex = [i for i in m.items.values() if i.content_type == texture.URI_TEXTURE]
+        self.assertEqual(len(tex), 1)
+        import plistlib
+        pl = plistlib.loads(item_bytes(self.out, m, tex[0]))
+        self.assertEqual(pl["HardwareModel"], "iPhone19,2")
+        self.assertEqual(pl["TextureStylePeopleDataVersion"], 3)
+        self.assertEqual(sum(1 for i in m.items.values() if i.content_type == "application/rdf+xml"), 12)
+        for iid in [i.item_id for i in m.items.values() if m.aux_uri(i) in texture.MATTE_URIS]:
+            self.assertTrue(any(rt == b"cdsc" and ts == [iid] for rt, f, ts in m.refs))
+
+    def test_grain_added_to_already_styled_photo(self):
+        no_grain = patch(self.src, grain=False).data
+        m, _ = parse_meta(no_grain)
+        self.assertFalse(any(i.content_type == "tag:apple.com,2026:photo:metadata:texture_styles" for i in m.items.values()))
+        upgraded = patch(no_grain)
+        self.assertTrue(upgraded.report["texture_only"])
+        with self.assertRaises(AlreadyStyled):
+            patch(upgraded.data)
+
     def test_ftyp_brands(self):
         self.assertIn(b"heix", self.out[:64])
 

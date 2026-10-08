@@ -1,11 +1,14 @@
 // Browser/Node port of the imagechanger patcher (see imagechanger/*.py). No dependencies.
-import { COLR_BOX, TILE_HVCC, TILE_SAMPLE, HALF_C, HALF_D } from "./constants.js";
+import { COLR_BOX, TILE_HVCC, TILE_SAMPLE, HALF_C, HALF_D, MATTE_HVCC, MATTE_SAMPLE, XMP } from "./constants.js";
 
 const URI_STYLES = "tag:apple.com,2023:photo:metadata:styles";
 const URI_LINEAR = "tag:apple.com,2023:photo:aux:linearthumbnail";
 const URI_DELTA = "tag:apple.com,2023:photo:aux:styledeltamap";
 const DELTA_SIZES = new Map([["4032x3024", [2880, 2160]], ["5712x4284", [4096, 3072]], ["3088x2316", [2240, 1680]]]);
 const TILE = 512;
+const URI_TEXTURE = "tag:apple.com,2026:photo:metadata:texture_styles";
+const MATTE_NAMES = ["semanticnosematte", "semanticskinmattev2", "semanticnonfaceskinmatte", "semanticlipsmatte", "semanticteethmattev2", "semanticpersonmatte", "semanticglassesmattev2", "semanticeyebrowsmatte", "semantictattoomatte", "semantichandsmatte", "semanticearsmatte", "semanticfaceskinmatte"];
+const MATTE_URIS = MATTE_NAMES.map((n) => "tag:apple.com,2026:photo:aux:" + n);
 const enc = new TextEncoder(), dec = new TextDecoder();
 export { box, fbox, u16, u32, str, cat, serialiseMeta };
 
@@ -278,10 +281,41 @@ export function looksLikeHeic(d) { return d.length > 12 && tag4(d, 4) === "ftyp"
 
 export function isStyled(buf) { const m = parseMeta(buf); return [...m.items.values()].some((i) => i.type === "uri " && i.ctype === URI_STYLES); }
 
-export function patch(buf, deltaOverride = null) {
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = (b) => { let c = 0xffffffff; for (let i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+const hasType = (meta, ctype) => [...meta.items.values()].some((i) => i.type === "uri " && i.ctype === ctype);
+
+function addTexture(meta, buf, primary, targets, rot) {
+  const present = new Set([...meta.items.values()].map((i) => auxUri(meta, i)));
+  const missing = MATTE_URIS.filter((u) => !present.has(u));
+  if (missing.length) {
+    const pI = addProp(meta, ispe(768, 576)), pP = addProp(meta, fbox("pixi", 0, 0, new Uint8Array([1, 8]))), pH = addProp(meta, b64(MATTE_HVCC));
+    const sample = b64(MATTE_SAMPLE), ids = new Map();
+    for (const uri of missing) {
+      const pA = addProp(meta, auxc(uri));
+      ids.set(uri, addItem(meta, "hvc1", sample, { ref: "auxl", to: targets, props: [[pI, false], [pP, false], [pA, true], [pH, true], ...rot] }));
+    }
+    for (const uri of missing) addItem(meta, "mime", b64(XMP), { ctype: "application/rdf+xml", ref: "cdsc", to: [ids.get(uri)] });
+  }
+  const tiles = meta.refs.filter(([t, f]) => t === "dimg" && f === primary.id)[0];
+  const src = tiles ? meta.items.get(tiles[2][0]) : primary;
+  const seed = crc32(itemBytes(buf, meta, src)) % 256;
+  const plist = plistBinary({ Preset: "Standard", CaptureType: "LF", CaptureMode: "Still", PortType: "PortTypeBack", HardwareModel: "iPhone19,2", TextureStylePeopleDataVersion: 3, FilmGrainSeed: seed });
+  addItem(meta, "uri ", plist, { name: "metadata", ctype: URI_TEXTURE, ref: "cdsc", to: targets });
+  return { mattes: missing.length, seed };
+}
+
+export function patch(buf, deltaOverride = null, grain = true) {
   const meta = parseMeta(buf);
-  if ([...meta.items.values()].some((i) => i.type === "uri " && i.ctype === URI_STYLES)) throw new AlreadyStyled("photo already carries Photographic Style data");
   const primary = meta.items.get(meta.primary); if (!primary) throw new HeifError("primary item missing");
+  if (hasType(meta, URI_STYLES)) {
+    if (!grain || hasType(meta, URI_TEXTURE)) throw new AlreadyStyled("photo already carries Photographic Style data");
+    const ir = propIndex(meta, primary, "irot");
+    const tg = [meta.primary, ...[...meta.items.values()].filter((i) => i.type === "tmap").slice(0, 1).map((i) => i.id)];
+    const note = addTexture(meta, buf, primary, tg, ir ? [[ir, true]] : []);
+    const f0 = [...boxes(buf)].find((x) => x.t === "ftyp");
+    return { data: assemble(buf, meta, buf.slice(f0.b0, f0.b1)), report: { texture: note, textureOnly: true } };
+  }
   const pi = propBox(meta, primary, "ispe"); if (!pi) throw new HeifError("primary has no ispe");
   const pw = rd(pi, 12, 4), ph = rd(pi, 16, 4);
   const size = deltaOverride || DELTA_SIZES.get(`${pw}x${ph}`) || (DELTA_SIZES.has(`${ph}x${pw}`) ? DELTA_SIZES.get(`${ph}x${pw}`).slice().reverse() : null);
@@ -310,6 +344,7 @@ export function patch(buf, deltaOverride = null) {
   meta.refs.push(["dimg", grid, tiles]);
   const mattes = [...meta.items.values()].some((i) => (auxUri(meta, i) || "").endsWith("portraiteffectsmatte"));
   const sid = addItem(meta, "uri ", buildStyles(mattes), { name: "metadata", ctype: URI_STYLES, ref: "cdsc", to: targets });
+  const texture = grain ? addTexture(meta, buf, primary, targets, rot) : "off";
   exif.loc = { kind: "new", data: addStyleTag(itemBytes(buf, meta, exif), styleRecord()) };
 
   const f = [...boxes(buf)].find((x) => x.t === "ftyp"), body = buf.subarray(f.b0 + 8, f.b1);
@@ -317,5 +352,5 @@ export function patch(buf, deltaOverride = null) {
   const at = brands.includes("MiHB") ? brands.indexOf("MiHB") + 1 : brands.length;
   brands.splice(at, 0, ...["MiHA", "heix"].filter((b) => !brands.includes(b)));
   const ftyp = box("ftyp", cat(body.subarray(0, 8), ...brands.map(str)));
-  return { data: assemble(buf, meta, ftyp), report: { primary: [pw, ph], deltaMap: [dw, dh], tiles: [rows, cols], linear: lin, styles: sid, grid } };
+  return { data: assemble(buf, meta, ftyp), report: { primary: [pw, ph], deltaMap: [dw, dh], tiles: [rows, cols], linear: lin, styles: sid, grid, texture } };
 }

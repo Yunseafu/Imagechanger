@@ -52,7 +52,7 @@ class JsParity(unittest.TestCase):
             if x.item_type == b"Exif":
                 self.assertEqual(makernote_tags(bj), makernote_tags(bp))
                 continue
-            if x.content_type == "tag:apple.com,2023:photo:metadata:styles":
+            if x.item_type == b"uri ":
                 self.assertEqual(plistlib.loads(bj), plistlib.loads(bp))
             else:
                 self.assertEqual(bj, bp, f"item {iid} payload differs")
