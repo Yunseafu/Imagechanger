@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Imagechanger · 摄影风格调色板</title>
+<meta name="description" content="在浏览器本地给旧 iPhone 的 HEIC 照片补上摄影风格数据,照片不会上传。">
+<style>
+:root{--bg:#f6f6f4;--fg:#1c1c1e;--mut:#6b6b70;--card:#fff;--line:#dcdcd6;--acc:#0a7d5a;--accfg:#fff;--warn:#fff4d6;--warnfg:#5a4300;--bad:#b3261e}
+@media (prefers-color-scheme:dark){:root{--bg:#141416;--fg:#ececee;--mut:#9a9aa2;--card:#1d1d20;--line:#333338;--acc:#3ecf9a;--accfg:#06241a;--warn:#33290a;--warnfg:#f0d98a;--bad:#ff8a80}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 -apple-system,"PingFang SC","Noto Sans SC",system-ui,sans-serif}
+main{max-width:720px;margin:0 auto;padding:32px 16px 64px}
+h1{font-size:1.6rem;margin:0 0 4px}
+.sub{color:var(--mut);margin:0 0 20px}
+.warn{background:var(--warn);color:var(--warnfg);border-radius:10px;padding:12px 14px;margin:0 0 20px;font-size:.92rem}
+#drop{display:block;border:2px dashed var(--line);border-radius:14px;background:var(--card);padding:36px 16px;text-align:center;cursor:pointer}
+#drop.over,#drop:focus-within{border-color:var(--acc)}
+#drop strong{display:block;font-size:1.05rem}
+#drop span{color:var(--mut);font-size:.9rem}
+#drop input{position:absolute;opacity:0;width:1px;height:1px}
+ul{list-style:none;padding:0;margin:20px 0 0}
+li{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 10px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.name{font-weight:600;word-break:break-all}
+.msg{color:var(--mut);font-size:.88rem}
+.msg.bad{color:var(--bad)}
+a.btn{background:var(--acc);color:var(--accfg);text-decoration:none;padding:8px 14px;border-radius:9px;font-weight:600;font-size:.92rem}
+h2{font-size:1.1rem;margin:36px 0 8px}
+ol,.notes{padding-left:1.2rem;margin:0}
+li.step{display:list-item;background:none;border:0;padding:0;margin:0 0 6px}
+code{background:var(--card);border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:.88em}
+footer{margin-top:40px;color:var(--mut);font-size:.85rem}
+a{color:var(--acc)}
+</style>
+</head>
+<body>
+<main>
+<h1>Imagechanger</h1>
+<p class="sub">给旧 iPhone 拍的 HEIC 补上「摄影风格」调色板数据。处理在你的浏览器里完成,照片不会上传。</p>
+<div class="warn"><b>实验性,未经真机验证。</b> 先备份原图。处理后是否出现调色板,需要你在 iOS 27 的「照片 → 编辑」里确认。</div>
+
+<label id="drop" tabindex="-1">
+  <input id="file" type="file" accept=".heic,.heif,image/heic,image/heif" multiple>
+  <strong>选择或拖入 HEIC 原图</strong>
+  <span>可多选 · 仅支持 12MP / 24MP / 前置尺寸 · 已带风格数据的照片会跳过</span>
+</label>
+<ul id="out" aria-live="polite"></ul>
+
+<h2>传回 iPhone 的正确方式</h2>
+<ol>
+  <li class="step">用 AirDrop 或「文件」App 保存结果,再在「文件」里点按图片 → 存储图像。</li>
+  <li class="step">不要经微信/邮件压缩转发,那会重编码并丢掉附加数据。</li>
+  <li class="step">iPhone 设置 → 相机 → 格式 选「高效」,否则拍出来是 JPEG,无法处理。</li>
+</ol>
+
+<h2>想用 Siri 自动处理?</h2>
+<p class="notes">在家里电脑/NAS 上运行本地服务,再建一个快捷指令即可,见
+<a href="https://github.com/yunseafu/imagechanger/blob/claude/zealous-edison-u48pio/docs/SIRI.md">Siri 指南</a>。</p>
+
+<footer>代码开源(MIT):<a href="https://github.com/yunseafu/imagechanger">github.com/yunseafu/imagechanger</a> · 非 Apple 官方项目</footer>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>

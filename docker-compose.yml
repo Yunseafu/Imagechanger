@@ -1,0 +1,5 @@
+services:
+  imagechanger:
+    build: .
+    ports: ["8765:8765"]
+    restart: unless-stopped
