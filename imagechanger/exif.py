@@ -104,3 +104,30 @@ def add_style_tag(exif_item: bytes, record: bytes | None = None) -> bytes:
     t += new_mn
     struct.pack_into(e + "II", t, mp + 4, len(new_mn), new_off)
     return bytes(head) + bytes(t)
+
+
+DEVICE = {0x010F: "Apple", 0x0110: "iPhone 18 Pro", 0x0131: "27.0"}   # Make, Model, Software
+
+
+def set_device(exif_item: bytes, values: dict | None = None) -> bytes:
+    """Overwrite the ASCII Make/Model/Software tags of IFD0 (tags that are absent stay absent)."""
+    values = DEVICE if values is None else values
+    tiff_off = 4 + struct.unpack_from(">I", exif_item, 0)[0]
+    head, t = exif_item[:tiff_off], bytearray(exif_item[tiff_off:])
+    e = "<" if t[:2] == b"II" else ">"
+    ifd0 = struct.unpack_from(e + "I", t, 4)[0]
+    for tag, text in values.items():
+        pos = _find(t, ifd0, e, tag)
+        if pos is None:
+            continue
+        raw = text.encode("ascii") + b"\0"
+        if len(raw) <= 4:
+            struct.pack_into(e + "HHI", t, pos, tag, 2, len(raw))
+            t[pos + 8:pos + 12] = raw.ljust(4, b"\0")
+        else:
+            if len(t) % 2:
+                t += b"\0"
+            off = len(t)
+            t += raw
+            struct.pack_into(e + "HHII", t, pos, tag, 2, len(raw), off)
+    return bytes(head) + bytes(t)

@@ -26,11 +26,12 @@ class ConvertTest(unittest.TestCase):
             (cls.dir / f"{role}.hvcc").write_bytes(hvcc)
             (cls.dir / f"{role}.sample").write_bytes(sample)
 
-    def run_js(self, jpeg):
+    def run_js(self, jpeg, probe=None, d=None):
         a, b = self.dir / "in.jpg", self.dir / "out.heic"
         a.write_bytes(jpeg)
-        r = subprocess.run(["node", str(ROOT / "tests" / "js_convert.mjs"), str(a), str(b), str(self.dir)],
-                           check=True, capture_output=True, text=True)
+        env = dict(__import__("os").environ, **({"PROBE": probe} if probe else {}))
+        r = subprocess.run(["node", str(ROOT / "tests" / "js_convert.mjs"), str(a), str(b), str(d or self.dir)],
+                           check=True, capture_output=True, text=True, env=env)
         return b.read_bytes(), json.loads(r.stdout)
 
     def check(self, out):
@@ -52,6 +53,29 @@ class ConvertTest(unittest.TestCase):
         m, _ = parse_meta(out)
         exif = item_bytes(out, m, m.by_type(b"Exif")[0])
         self.assertIn(b"\x00\x01\x00\t\x00\x00\x00\x01\x00\x00\x00\x07", exif)   # original MakerNote tag 0x0001 = 7
+
+    def test_prerotated_bitmap_is_not_rotated_again(self):
+        """Browser already applied EXIF orientation 6: no irot, swapped size, orientation reset."""
+        import pillow_heif
+        from PIL import Image
+        pillow_heif.register_heif_opener()
+        d = Path(tempfile.mkdtemp())
+        for role, (w, h) in {"main": (3024, 4032), "thumb": (768, 1024)}.items():
+            hvcc, sample = jpeg_case.encode_still(w, h)
+            (d / f"{role}.hvcc").write_bytes(hvcc)
+            (d / f"{role}.sample").write_bytes(sample)
+        out, info = self.run_js(jpeg_case.make_jpeg(exif=False, orientation=6), probe="3024x4032", d=d)
+        self.assertEqual(info["size"], [3024, 4032])
+        m, _ = parse_meta(out)
+        self.assertFalse(any(raw[4:8] == b"irot" for raw in m.properties))
+        self.assertEqual(Image.open(BytesIO(out)).size, (3024, 4032))
+
+    def test_unrotated_bitmap_gets_irot(self):
+        out, info = self.run_js(jpeg_case.make_jpeg(exif=False, orientation=6), probe="4032x3024")
+        m, _ = parse_meta(out)
+        irots = [raw for raw in m.properties if raw[4:8] == b"irot"]
+        self.assertEqual(len(irots), 1)
+        self.assertEqual(irots[0][8], 3)         # EXIF 6 == rotate 270 degrees counter-clockwise
 
     def test_jpeg_without_exif_gets_synthetic_makernote(self):
         out, info = self.run_js(jpeg_case.make_jpeg(exif=False))

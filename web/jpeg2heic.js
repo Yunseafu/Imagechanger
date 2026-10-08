@@ -32,6 +32,13 @@ function tiffOrientation(t) {
   return 1;
 }
 
+function setTiffOrientation(t, value) {
+  const out = t.slice(), le = out[0] === 0x49, dv = new DataView(out.buffer);
+  const ifd = dv.getUint32(4, le), n = dv.getUint16(ifd, le);
+  for (let i = 0; i < n; i++) { const e = ifd + 2 + 12 * i; if (dv.getUint16(e, le) === 0x0112) dv.setUint16(e + 8, value, le); }
+  return out;
+}
+
 // A TIFF stream with an Apple MakerNote that holds no tags yet (patch() adds 0x54).
 function syntheticExif(orientation) {
   const mn = cat(str("Apple iOS\0"), new Uint8Array([0, 1, 0x4d, 0x4d]), u16(0), u32(0));
@@ -54,17 +61,27 @@ function colrBox(icc) {
 
 export async function jpegToHeic(jpeg, encode) {
   const info = parseJpeg(jpeg);
-  if (!(info.orientation in IROT)) throw new HeifError("mirrored EXIF orientation is not supported");
-  const { width: w, height: h } = info;
-  const landscape = w >= h, tw = landscape ? 1024 : 768, th = landscape ? 768 : 1024;
+  let { width: w, height: h, orientation } = info, exifSrc = info.exif;
+  if (!(orientation in IROT)) throw new HeifError("mirrored EXIF orientation is not supported");
+  // Some browsers hand back an already-rotated bitmap. Never rotate twice: keep the pixels exactly
+  // as the browser gives them and clear the orientation.
+  if (encode.probe) {
+    const b = await encode.probe();
+    if (b.width === h && b.height === w && w !== h) {
+      [w, h] = [h, w]; orientation = 1;
+      if (exifSrc) exifSrc = setTiffOrientation(exifSrc, 1);
+    } else if (b.width !== w || b.height !== h) throw new HeifError("图片尺寸与 JPEG 头信息不一致,已停止以免裁切变形");
+  }
+  const even = (n) => Math.max(2, Math.round(n / 2) * 2);
+  const tw = w >= h ? 1024 : even(1024 * w / h), th = w >= h ? even(1024 * h / w) : 1024;
   const main = await encode(w, h, "main");
   const thumb = await encode(tw, th, "thumb");
 
-  const exifTiff = info.exif && hasAppleMakerNote(info.exif) ? info.exif : syntheticExif(info.orientation);
+  const exifTiff = exifSrc && hasAppleMakerNote(exifSrc) ? exifSrc : syntheticExif(orientation);
   const props = [], P = (raw) => (props.push(raw), props.length);
   const ispeM = P(fbox("ispe", 0, 0, cat(u32(w), u32(h)))), hvcM = P(main.hvcC), colr = P(colrBox(info.icc));
   const pixi = P(fbox("pixi", 0, 0, new Uint8Array([3, 8, 8, 8])));
-  const rot = IROT[info.orientation], irot = rot ? P(box("irot", new Uint8Array([rot]))) : null;
+  const rot = IROT[orientation], irot = rot ? P(box("irot", new Uint8Array([rot]))) : null;
   const ispeT = P(fbox("ispe", 0, 0, cat(u32(tw), u32(th)))), hvcT = P(thumb.hvcC);
 
   const item = (id, type, data, assoc, hidden) => ({ id, type, name: "", ctype: "", hidden, loc: { kind: "new", data }, props: assoc });
@@ -83,7 +100,7 @@ export async function jpegToHeic(jpeg, encode) {
   for (const it of items.values()) { offs.set(it.id, cur); cur += it.loc.data.length; }
   const finalMeta = serialiseMeta(meta, offs, (o) => o);
   const heic = cat(ftyp, finalMeta, box("mdat", cat(...[...items.values()].map((i) => i.loc.data))));
-  return { heic, synthesizedExif: exifTiff !== info.exif, size: [w, h] };
+  return { heic, synthesizedExif: exifTiff !== exifSrc, size: [w, h] };
 }
 
 export async function convertAndPatch(jpeg, encode) {
@@ -95,10 +112,10 @@ export async function convertAndPatch(jpeg, encode) {
 // ----- browser encoder (WebCodecs). Returns { hvcC: <full hvcC box>, sample: <length-prefixed> }.
 export function webCodecsEncoder(jpegBlob) {
   let bitmapP = null;
-  return async function encode(w, h, role) {
+  const getBitmap = () => (bitmapP ||= createImageBitmap(jpegBlob, { imageOrientation: "none", colorSpaceConversion: "none" }));
+  const encode = async function (w, h, role) {
     if (typeof VideoEncoder === "undefined") throw new HeifError("此浏览器不支持 WebCodecs,无法在网页里转换 JPEG。请改用「从文件选择」传原始 HEIC。");
-    bitmapP ||= createImageBitmap(jpegBlob, { imageOrientation: "none", colorSpaceConversion: "none" });
-    const bmp = await bitmapP;
+    const bmp = await getBitmap();
     const canvas = new OffscreenCanvas(w, h), ctx = canvas.getContext("2d");
     ctx.drawImage(bmp, 0, 0, w, h);
     const level = w * h > 35_000_000 ? "L180" : "L153";
@@ -121,4 +138,6 @@ export function webCodecsEncoder(jpegBlob) {
     if (chunkData[0] === 0 && chunkData[1] === 0 && (chunkData[2] === 1 || (chunkData[2] === 0 && chunkData[3] === 1))) throw new HeifError("此浏览器的 HEVC 输出格式不受支持");
     return { hvcC: box("hvcC", description), sample: chunkData };
   };
+  encode.probe = async () => { const b = await getBitmap(); return { width: b.width, height: b.height }; };
+  return encode;
 }

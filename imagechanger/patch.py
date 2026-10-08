@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from . import icc, matte_tile, neutral_tile, styles, texture
 from .assemble import assemble
 from .bmff import HeifError, Meta, box, full_box, item_bytes, iter_boxes, parse_meta
-from .exif import add_style_tag
+from .exif import add_style_tag, set_device
 
 # StyleDeltaMap size for a primary of a given stored size (sizes seen in native files).
 DELTA_SIZES = {(4032, 3024): (2880, 2160), (5712, 4284): (4096, 3072), (3088, 2316): (2240, 1680)}
@@ -71,7 +71,7 @@ def seed_source(meta: Meta, primary):
     return meta.items[tiles[0]] if tiles else primary
 
 
-def patch(buf: bytes, *, tone_stats: dict | None = None, delta_override=None, grain: bool = True) -> Result:
+def patch(buf: bytes, *, tone_stats: dict | None = None, delta_override=None, grain: bool = True, device: bool = True) -> Result:
     meta, _span = parse_meta(buf)
     primary = meta.items.get(meta.primary)
     if primary is None:
@@ -139,7 +139,8 @@ def patch(buf: bytes, *, tone_stats: dict | None = None, delta_override=None, gr
 
     grain_report = add_texture(meta, buf, primary, targets, rot) if grain else "off"
 
-    exif.loc = ("new", add_style_tag(item_bytes(buf, meta, exif)))
+    exif_data = item_bytes(buf, meta, exif)
+    exif.loc = ("new", add_style_tag(set_device(exif_data) if device else exif_data))
 
     ftyp = next(b for b in iter_boxes(buf) if b[0] == b"ftyp")
     out = assemble(buf, meta, with_style_brands(buf[ftyp[1]:ftyp[3]]))

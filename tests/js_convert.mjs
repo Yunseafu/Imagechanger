@@ -6,6 +6,7 @@ const encode = async (w, h, role) => ({
   hvcC: new Uint8Array(readFileSync(`${dir}/${role}.hvcc`)),
   sample: new Uint8Array(readFileSync(`${dir}/${role}.sample`)),
 });
+if (process.env.PROBE) { const [pw, ph] = process.env.PROBE.split('x').map(Number); encode.probe = async () => ({ width: pw, height: ph }); }
 const res = await convertAndPatch(new Uint8Array(readFileSync(inp)), encode);
 writeFileSync(out, res.data);
 console.log(JSON.stringify({ synthesized: res.synthesizedExif, size: res.size, report: res.report }));

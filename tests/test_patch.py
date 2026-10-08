@@ -103,6 +103,16 @@ class PatchTest(unittest.TestCase):
         with self.assertRaises(AlreadyStyled):
             patch(upgraded.data)
 
+    def test_device_is_iphone_18_pro(self):
+        m, _ = parse_meta(self.out)
+        data = item_bytes(self.out, m, m.by_type(b"Exif")[0])
+        self.assertIn(b"iPhone 18 Pro\0", data)
+        self.assertIn(b"27.0\0", data)
+        sid = self.res.report["styles_item"]
+        import plistlib
+        pl = plistlib.loads(item_bytes(self.out, m, m.items[sid]))
+        self.assertEqual((pl["0"], pl["k"], pl["l"]), (16, False, False))
+
     def test_ftyp_brands(self):
         self.assertIn(b"heix", self.out[:64])
 

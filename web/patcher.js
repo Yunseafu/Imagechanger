@@ -200,6 +200,24 @@ function addStyleTag(item, record) {
   return cat(head, t);
 }
 
+const DEVICE = [[0x010f, "Apple"], [0x0110, "iPhone 18 Pro"], [0x0131, "27.0"]];
+// Overwrite the ASCII Make/Model/Software tags of IFD0 (absent tags stay absent).
+export function setDevice(item) {
+  const d = (a) => new DataView(a.buffer, a.byteOffset, a.byteLength);
+  const tiffOff = 4 + d(item).getUint32(0), head = item.slice(0, tiffOff); let t = item.slice(tiffOff);
+  const le = t[0] === 0x49, ifd0 = d(t).getUint32(4, le);
+  for (const [tag, text] of DEVICE) {
+    const n = d(t).getUint16(ifd0, le); let pos = null;
+    for (let i = 0; i < n; i++) { const p = ifd0 + 2 + 12 * i; if (d(t).getUint16(p, le) === tag) pos = p; }
+    if (pos === null) continue;
+    const raw = cat(str(text), new Uint8Array(1));
+    d(t).setUint16(pos + 2, 2, le); d(t).setUint32(pos + 4, raw.length, le);
+    if (raw.length <= 4) { t.fill(0, pos + 8, pos + 12); t.set(raw, pos + 8); }
+    else { if (t.length % 2) t = cat(t, new Uint8Array(1)); d(t).setUint32(pos + 8, t.length, le); t = cat(t, raw); }
+  }
+  return cat(head, t);
+}
+
 // ------------------------------------------------------------------ binary plist
 // Supports: int (non-negative), double, boolean, Uint8Array, string, plain object (string keys).
 function plistBinary(root, forceReal = new Set()) {
@@ -264,10 +282,10 @@ function buildStyles(personMasks) {
   six.LinearGTCImage = empty(0.0); six.ToneMappedImage = tone; six.LinearImage = linear;
   const reals = new Set(["4", "h", "j", "OriginalRangeMin", "OriginalRangeMax", "Gain", "PeopleRatio", "SkinRatio", "PersonMasksValidHint", ...Object.keys(tone), ...Object.keys(six)]);
   const pl = {
-    0: 14, 1: identityField(), 2: true, 3: toneCurve(), 4: 5.384615421295166, 5: 0, 6: six,
+    0: 16, 1: identityField(), 2: true, 3: toneCurve(), 4: 5.384615421295166, 5: 0, 6: six,
     7: { PeopleRatio: 0.0, SkinRatio: 0.0, PersonMasksValidHint: personMasks ? 1.0 : -1.0 },
     c: halfBlob(HALF_C, 1024), d: halfBlob(HALF_D, 1024), e: 32, f: 32, g: 0x4c303068, h: GAIN / 4,
-    i: { OriginalRangeMin: -0.0019588470458984375, OriginalRangeMax: 0.08447265625, Gain: GAIN }, j: 1.0,
+    i: { OriginalRangeMin: -0.0019588470458984375, OriginalRangeMax: 0.08447265625, Gain: GAIN }, j: 1.0, k: false, l: false,
   };
   return plistBinary(pl, reals);
 }
@@ -305,7 +323,7 @@ function addTexture(meta, buf, primary, targets, rot) {
   return { mattes: missing.length, seed };
 }
 
-export function patch(buf, deltaOverride = null, grain = true) {
+export function patch(buf, deltaOverride = null, grain = true, device = true) {
   const meta = parseMeta(buf);
   const primary = meta.items.get(meta.primary); if (!primary) throw new HeifError("primary item missing");
   if (hasType(meta, URI_STYLES)) {
@@ -345,7 +363,8 @@ export function patch(buf, deltaOverride = null, grain = true) {
   const mattes = [...meta.items.values()].some((i) => (auxUri(meta, i) || "").endsWith("portraiteffectsmatte"));
   const sid = addItem(meta, "uri ", buildStyles(mattes), { name: "metadata", ctype: URI_STYLES, ref: "cdsc", to: targets });
   const texture = grain ? addTexture(meta, buf, primary, targets, rot) : "off";
-  exif.loc = { kind: "new", data: addStyleTag(itemBytes(buf, meta, exif), styleRecord()) };
+  const exifData = itemBytes(buf, meta, exif);
+  exif.loc = { kind: "new", data: addStyleTag(device ? setDevice(exifData) : exifData, styleRecord()) };
 
   const f = [...boxes(buf)].find((x) => x.t === "ftyp"), body = buf.subarray(f.b0 + 8, f.b1);
   const brands = []; for (let i = 8; i < body.length; i += 4) brands.push(tag4(body, i));

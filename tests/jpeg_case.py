@@ -10,10 +10,14 @@ from tests import fixture
 COLOR = (90, 140, 200)
 
 
-def make_jpeg(w=4032, h=3024, exif=True) -> bytes:
+def make_jpeg(w=4032, h=3024, exif=True, orientation=None) -> bytes:
     from PIL import Image
     buf = BytesIO()
     kw = {"exif": b"Exif\0\0" + fixture.apple_exif()[10:]} if exif else {}
+    if orientation:
+        ex = Image.Exif()
+        ex[0x0112] = orientation
+        kw = {"exif": ex.tobytes()}
     Image.new("RGB", (w, h), COLOR).save(buf, "JPEG", quality=90, **kw)
     return buf.getvalue()
 

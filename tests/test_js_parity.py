@@ -51,6 +51,8 @@ class JsParity(unittest.TestCase):
             bj, bp = item_bytes(js, mj, x), item_bytes(py, mp, y)
             if x.item_type == b"Exif":
                 self.assertEqual(makernote_tags(bj), makernote_tags(bp))
+                self.assertIn(b"iPhone 18 Pro\0", bj)
+                self.assertIn(b"iPhone 18 Pro\0", bp)
                 continue
             if x.item_type == b"uri ":
                 self.assertEqual(plistlib.loads(bj), plistlib.loads(bp))

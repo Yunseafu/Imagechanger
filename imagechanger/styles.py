@@ -8,7 +8,7 @@ URI_STYLES = "tag:apple.com,2023:photo:metadata:styles"
 URI_LINEAR_THUMB = "tag:apple.com,2023:photo:aux:linearthumbnail"
 URI_STYLE_DELTA = "tag:apple.com,2023:photo:aux:styledeltamap"
 
-SCHEMA = 14                  # accepted by iOS 18.2 through 27
+SCHEMA = 16                  # iOS 27 / iPhone 18 generation (14 and 15 are older)
 REGIONS = 2 * 18 * 24        # spatial cells of the colour-transform field
 TERMS = 10                   # 1, R, G, B, R2, G2, B2, RG, RB, GB
 LIGHT_MAP = 32               # light maps are 32x32 half floats
@@ -99,5 +99,7 @@ def build_styles(tone_stats: dict | None = None, person_masks: bool = False) -> 
         "i": {"OriginalRangeMin": -0.0019588470458984375,
               "OriginalRangeMax": 0.08447265625, "Gain": GAIN},
         "j": 1.0,
+        "k": False,
+        "l": False,
     }
     return plistlib.dumps(plist, fmt=plistlib.FMT_BINARY, sort_keys=False)

@@ -22,6 +22,16 @@ function row(name) {
 }
 const bad = (m, text) => { m.className = "msg bad"; m.textContent = text; };
 function download(li, bytes, type, filename) {
+  if (type === "image/heic") {
+    const url = URL.createObjectURL(new Blob([bytes], { type }));
+    const img = document.createElement("img");
+    img.className = "preview"; img.alt = filename; img.src = url;
+    img.addEventListener("load", () => { li.querySelector(".hint")?.classList.remove("hidden"); });
+    img.addEventListener("error", () => img.remove());
+    const hint = document.createElement("div");
+    hint.className = "hint hidden"; hint.textContent = "长按上面的图片 → 添加到照片(或点下载)";
+    li.append(img, hint);
+  }
   const a = document.createElement("a");
   a.className = "btn"; a.href = URL.createObjectURL(new Blob([bytes], { type })); a.download = filename; a.textContent = "下载";
   li.append(a);
