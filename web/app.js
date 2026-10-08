@@ -1,4 +1,5 @@
 import { patch, looksLikeHeic, AlreadyStyled } from "./patcher.js";
+import { convertAndPatch, webCodecsEncoder } from "./jpeg2heic.js";
 
 const list = document.getElementById("out");
 const drop = document.getElementById("drop");
@@ -45,7 +46,11 @@ async function run(files) {
         m.textContent = "Live Photo 视频 · 原样保留,请与处理后的 HEIC 一起存入相册";
         download(li, data, "video/quicktime", baseName(f.name) + "_styled.mov");
       } else if (isJpeg(data)) {
-        bad(m, "这是 JPEG,不是 HEIC:iOS 从相册选图时已自动转换。请改用「从文件选择」,见下方说明。");
+        m.textContent = "收到 JPEG(iOS 已自动转换),正在转成 HEIC 并补风格数据…";
+        const res = await convertAndPatch(data, webCodecsEncoder(f));
+        m.textContent = `已从 JPEG 转换 · ${res.size.join("×")} · ${(res.data.length / 1048576).toFixed(1)} MB · 有损重新编码` +
+          (res.synthesizedExif ? " · 原图没有 Apple 元数据,已补最小 Exif" : "");
+        download(li, res.data, "image/heic", baseName(f.name) + "_styled.heic");
       } else {
         bad(m, "无法识别的文件类型");
       }

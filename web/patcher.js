@@ -7,6 +7,7 @@ const URI_DELTA = "tag:apple.com,2023:photo:aux:styledeltamap";
 const DELTA_SIZES = new Map([["4032x3024", [2880, 2160]], ["5712x4284", [4096, 3072]], ["3088x2316", [2240, 1680]]]);
 const TILE = 512;
 const enc = new TextEncoder(), dec = new TextDecoder();
+export { box, fbox, u16, u32, str, cat, serialiseMeta };
 
 export class HeifError extends Error {}
 export class AlreadyStyled extends HeifError {}
